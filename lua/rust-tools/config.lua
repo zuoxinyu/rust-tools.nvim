@@ -104,6 +104,12 @@ local defaults = {
         -- scroll down
         -- default: "<c-k>"
         scroll_down = "<c-k>",
+        -- function/nil/false
+        -- a function accepts an integer indicating the n-th command,
+        -- the returned string must be a valid key can be used to
+        -- define a key mapping, for example: "<c-%d>"/"<leader>%d"
+        -- default: function(i) return string.format("<c-%d>", i) end
+        cmd_key = function(i) return string.format("<c-%d>", i) end
       },
     },
 

@@ -8,13 +8,13 @@ local function get_params()
   return vim.lsp.util.make_position_params()
 end
 
-M._state = { winnr = nil, parent_bufnr = nil, commands = nil }
+M._state = { winnr = nil, parent_bufnr = nil, commands = {} }
 local set_keymap_opt = { noremap = true, silent = true }
 
 -- run the command under the cursor, if the thing under the cursor is not the
 -- command then do nothing
-function M._run_command()
-  local line = vim.api.nvim_win_get_cursor(M._state.winnr)[1]
+function M._run_command(row)
+  local line = row or vim.api.nvim_win_get_cursor(M._state.winnr)[1]
 
   if line > #M._state.commands then
     return
@@ -64,6 +64,10 @@ function M.handler(_, result)
     return
   end
 
+  -- update parent_bufnr before focus on hover buf
+  local parent_bufnr = vim.api.nvim_get_current_buf()
+  M._state.parent_bufnr = parent_bufnr
+
   local markdown_lines = util.convert_input_to_markdown_lines(result.contents)
   if result.actions then
     M._state.commands = result.actions[1].commands
@@ -83,10 +87,6 @@ function M.handler(_, result)
     -- return { 'No information available' }
     return
   end
-
-  -- update parent_bufnr before focus on hover buf
-  local parent_bufnr = vim.api.nvim_get_current_buf()
-  M._state.parent_bufnr = parent_bufnr
 
   local bufnr, winnr = util.open_floating_preview(
     markdown_lines,
@@ -135,6 +135,18 @@ function M.handler(_, result)
       ":lua require'rust-tools.hover_actions'.scroll_hover(-1)<CR>",
       { silent = true }
     )
+
+    if keymaps.cmd_key ~= nil and keymaps.cmd_key ~= false then
+      for i, value in ipairs(M._state.commands) do
+        vim.api.nvim_buf_set_keymap(
+          M._state.parent_bufnr,
+          "n",
+          keymaps.cmd_key(i),
+          string.format(":lua require'rust-tools.hover_actions'._run_command(%d)<CR>", i),
+          { silent = true }
+        )
+      end
+    end
   end
 
   vim.api.nvim_buf_attach(bufnr, false, {
@@ -143,6 +155,9 @@ function M.handler(_, result)
       if keymaps.enable then
         vim.api.nvim_buf_del_keymap(M._state.parent_bufnr, "n", keymaps.scroll_up)
         vim.api.nvim_buf_del_keymap(M._state.parent_bufnr, "n", keymaps.scroll_down)
+        for i, _ in ipairs(M._state.commands) do
+          vim.api.nvim_buf_del_keymap(M._state.parent_bufnr, "n", keymaps.cmd_key(i))
+        end
       end
     end,
   })
